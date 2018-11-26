@@ -1,0 +1,49 @@
+---
+# tasks file for jetty
+- unarchive:
+    src: http://repo1.maven.org/maven2/org/eclipse/jetty/jetty-distribution/{{ jetty_version }}/jetty-distribution-{{ jetty_version }}.tar.gz
+    dest: "{{ jetty_dst_dir }}"
+    remote_src: True
+
+- name: Create group
+  group:
+    name={{ jetty_group_name }}
+    state=present
+    system=yes
+  when: jetty_group_create
+
+- name: Create user
+  user:
+    name={{ jetty_user_name }}
+    state=present
+    comment='Jetty Web Server'
+    createhome=no
+    group={{ jetty_group_name }}
+    home={{ jetty_user_homedir }}
+    shell=/usr/sbin/nologin
+    system=yes
+  when: jetty_user_create
+
+- name: Create symbolic link to distribution
+  file:
+    src="{{ jetty_dst_dir }}/jetty-distribution-{{ jetty_version}}"
+    dest={{ jetty_dst_dir }}/jetty
+    state=link
+
+- name: Install Java
+  yum: name=java-1.8.0-openjdk state=present
+
+- name: Make Jetty as a Service
+  copy: src={{ jetty_user_homedir }}/bin/jetty.sh dest=/etc/init.d/jetty remote_src=yes mode=755
+
+- name: Set JETTY_HOME
+  copy: src=/etc/default/jetty dest=/etc/default/jetty
+
+- name: copy artifacts
+  copy: src={{ item }} dest={{ jetty_user_homedir }}/webapps/ owner=jetty group=jetty
+  with_items:
+   - test.xml
+   - test.war
+
+- name: Start Jetty
+  service: name=jetty state=restarted
